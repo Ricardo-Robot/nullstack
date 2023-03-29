@@ -1,6 +1,8 @@
-const settings = {...window.settings};
-delete window.settings;
+import state from './state'
 
-Object.freeze(settings);
+const settings = { ...state.settings }
+delete state.settings
 
-export default settings;
+Object.freeze(settings)
+
+export default settings

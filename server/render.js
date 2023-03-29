@@ -1,55 +1,77 @@
-export default function render(node, scope) {
+import { isFalse } from '../shared/nodes'
+import { sanitizeHtml } from '../shared/sanitizeString'
+import renderAttributes from './renderAttributes'
 
-  if(node === false || (node !== undefined && node.type === false)) {
-    return "<!---->";
+function isSelfClosing(type) {
+  if (type === 'input') return true
+  if (type === 'img') return true
+  if (type === 'link') return true
+  if (type === 'meta') return true
+  if (type === 'br') return true
+  if (type === 'hr') return true
+  if (type === 'area') return true
+  if (type === 'base') return true
+  if (type === 'col') return true
+  if (type === 'embed') return true
+  if (type === 'param') return true
+  if (type === 'source') return true
+  if (type === 'track') return true
+  if (type === 'wbr') return true
+  if (type === 'menuitem') return true
+  return false
+}
+
+function renderBody(node, scope, next) {
+  if (isFalse(node)) {
+    return '<!---->'
   }
-
-  if(node === undefined || node.type === undefined) {
-    return (node || ' ') + "<!--#-->";
+  if (node.type === 'text') {
+    const text = node.text === '' ? ' ' : sanitizeHtml(node.text.toString())
+    return next && next.type === 'text' ? `${text}<!--#-->` : text
   }
-
-  let element = `<${node.type}`;
-
-  for(let name in node.attributes) {
-    if(!name.startsWith('on') && name !== 'html') {
-      const type = typeof(node.attributes[name]);
-      if(type !== 'object' && type !== 'function') {
-        if(name != 'value' && node.attributes[name] === true) {
-          element += ` ${name}`;
-        } else if(name == 'value' || (node.attributes[name] !== false && node.attributes[name] !== null && node.attributes[name] !== undefined)) {
-          element += ` ${name}="${node.attributes[name]}"`;
-        }
-      }
-    }
-  }
-
-  const selfClosing = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', 'menuitem'].includes(node.type);
-  if(selfClosing && node.children.length === 0) {
-    element += '/>';
-
+  let element = `<${node.type}`
+  element += renderAttributes(node.attributes)
+  if (isSelfClosing(node.type)) {
+    element += '/>'
   } else {
-    element += '>';
-    if(node.attributes.html) {
-      const source = node.attributes.html;
-      if(node.type === 'head') {
-        scope.head += source;
-      } else {
-        element += source;
-      }
-    } else if(node.type === 'textarea') {
-      element += node.children[0];
+    element += '>'
+    if (node.attributes.html) {
+      const source = node.attributes.html
+      element += source
+    } else if (node.type === 'textarea') {
+      element += node.children[0].text
     } else {
-      for(let i = 0; i < node.children.length; i++) {
-        const source = render(node.children[i], scope);
-        if(node.type === 'head') {
-          scope.head += source;
-        } else {
-          element += source;
-        }
+      for (let i = 0; i < node.children.length; i++) {
+        element += renderBody(node.children[i], scope, node.children[i + 1])
       }
     }
-    element += `</${node.type}>`;
+    element += `</${node.type}>`
   }
-  
-  return node.type === 'head' ? '<!-- -->' : element;
+  return element
+}
+
+function renderHead(scope) {
+  const limit = scope.nextHead.length
+  for (let i = 0; i < limit; i++) {
+    const node = scope.nextHead[i]
+    if (isFalse(node)) {
+      continue
+    }
+    scope.head += `<${node.type}`
+    scope.head += renderAttributes(node.attributes)
+    if (isSelfClosing(node.type)) {
+      scope.head += '/>'
+    } else {
+      scope.head += '>'
+      if (node.attributes.html) {
+        scope.head += node.attributes.html
+      }
+      scope.head += `</${node.type}>`
+    }
+  }
+}
+
+export default function render(node, scope, next) {
+  renderHead(scope)
+  return renderBody(node, scope, next)
 }

@@ -1,25 +1,37 @@
-import { generateObjectProxy } from './objectProxyHandler';
-import client from './client';
-import {generateContext} from './context';
+import client from './client'
+import { generateContext } from './context'
+import { generateObjectProxy } from './objectProxyHandler'
+
+export const instanceProxies = new WeakMap()
 
 const instanceProxyHandler = {
-  get(target, name) {
-    if(name === '_isProxy') return true;
-    if(typeof(target[name]) == 'function' && !target[name].name.startsWith('_') && name !== 'constructor') {
-      return (args) => {
-        const context = generateContext({...target._attributes, ...args, self: target._self});
-        return target[name](context);
+  get(target, name, receiver) {
+    if (name === '_isProxy') return true
+    if (target.constructor[name]?.name === '_invoke') return target.constructor[name].bind(target.constructor)
+    if (typeof target[name] === 'function' && name !== 'constructor') {
+      const proxy = instanceProxies.get(target)
+      if (name.startsWith('_')) {
+        return target[name].bind(proxy)
       }
+      const { [name]: named } = {
+        [name]: (args) => {
+          const context = generateContext({ ...target._attributes, ...args })
+          return target[name].call(proxy, context)
+        },
+      }
+      return named
     }
-    return Reflect.get(...arguments);
+    return Reflect.get(target, name, receiver)
   },
   set(target, name, value) {
-    target[name] = generateObjectProxy(name, value);
-    if(!name.startsWith('_')) {
-      client.update();
+    if (!name.startsWith('_')) {
+      target[name] = generateObjectProxy(name, value)
+      client.update()
+    } else {
+      target[name] = value
     }
-    return true;
-  }
+    return true
+  },
 }
 
-export default instanceProxyHandler;
+export default instanceProxyHandler

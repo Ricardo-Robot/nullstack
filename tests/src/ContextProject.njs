@@ -1,28 +1,30 @@
-import Nullstack from 'nullstack';
+import Nullstack from 'nullstack'
 
 class ContextProject extends Nullstack {
 
-  static async start({project}) {
-    project.color = '#d22365';
-    project.backgroundColor = '#d22365';
-    project.type = 'website';
-    project.display = 'standalone';
-    project.orientation = 'portrait';
-    project.scope = '/';
-    project.root = '/';
+  static async start({ project }) {
+    project.color = '#d22365'
+    project.backgroundColor = '#d22365'
+    project.type = 'website'
+    project.display = 'standalone'
+    project.orientation = 'portrait'
+    project.scope = '/'
+    project.root = '/'
+    project.folderIcons = project.icons
     project.icons = {
-      '72': '/icon-72x72.png',
-      '144': '/icon-144x144.png'
-    };
-    project.favicon = '/favicon-96x96.png';
-    project.disallow = ['/admin'];
-    project.sitemap = true;
-    project.cdn = '127.0.0.1:6969'
+      72: '/icon-72x72.png',
+      144: '/icon-144x144.png',
+    }
+    project.favicon = '/favicon-96x96.png'
+    project.disallow = ['/admin']
+    project.sitemap = true
+    project.viewport = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no viewport-fit=cover'
   }
-  
-  render({project}) {
+
+  render({ project }) {
+    const ignoredUnmatchedIcon = !Object.keys(project.folderIcons).find((key) => /icon-(\d+)x\1\.[a-zA-Z]+/.test(key))
     return (
-      <div> 
+      <div>
         <div data-project={!!project} />
         <div data-name={project.name} />
         <div data-short-name={project.shortName} />
@@ -40,11 +42,12 @@ class ContextProject extends Nullstack {
         <div data-disallow={!!project.disallow} />
         <div data-disallow-admin={project.disallow[0]} />
         <div data-sitemap={project.sitemap} />
-        <div data-cdn={project.cdn} />
+        <div data-viewport={project.viewport} />
+        <div data-ignored-unmatched-icon={ignoredUnmatchedIcon} />
       </div>
     )
   }
 
 }
 
-export default ContextProject;
+export default ContextProject

@@ -1,6 +1,10 @@
-const environment = {...window.environment, client: true, server: false};
-//delete window.environment;
+import state from './state'
 
-Object.freeze(environment);
+const environment = {
+  ...state.environment,
+  client: true,
+  server: false,
+  event: 'nullstack.environment',
+}
 
-export default environment;
+export default environment

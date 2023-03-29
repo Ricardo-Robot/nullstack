@@ -1,36 +1,27 @@
-import routable from '../plugins/routable';
-import bindable from '../plugins/bindable';
-import datable from '../plugins/datable';
-import parameterizable from '../plugins/parameterizable';
-import anchorable from '../plugins/anchorable';
-import objectable from '../plugins/objectable';
+import anchorable from '../plugins/anchorable'
+import bindable from '../plugins/bindable'
+import parameterizable from '../plugins/parameterizable'
+import routable from '../plugins/routable'
 
-let plugins = [
-  objectable,
-  parameterizable,
-  anchorable,
-  routable,
-  datable,
-  bindable
-];
+const plugins = [parameterizable, anchorable, routable, bindable]
 
 export function transformNodes(scope, node, depth) {
-  for(const plugin of plugins) {
-    plugin.transform({...scope.context, node, depth});
+  for (const plugin of plugins) {
+    plugin.transform({ ...scope.context, node, depth })
   }
 }
 
 export function loadPlugins(scope) {
-  for(const plugin of plugins) {
+  for (const plugin of plugins) {
     plugin.load && plugin.load(scope.context)
   }
-  return plugins;
+  return plugins
 }
 
-export function usePlugins(environment) {
-  return async (...userPlugins) => {
-    plugins = [
-      ...new Set([...userPlugins.flat(), ...plugins])
-    ].filter((plugin) => plugin[environment])
-  }
+export function useClientPlugins(plugin) {
+  if (plugin.client) plugins.push(plugin)
+}
+
+export function useServerPlugins(plugin) {
+  if (plugin.server) plugins.push(plugin)
 }

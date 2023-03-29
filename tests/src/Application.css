@@ -1,3 +1,35 @@
+body {
+  background: url(favicon-96x96.png) no-repeat bottom right;
+}
+
 #application * {
   display: block;
+}
+
+:root {
+  --custom-var-value: red;
+}
+
+.class-\[custom\] {
+  background: red;
+}
+
+.class-0\.5 {
+  background: blue;
+}
+
+.class-05 {
+  background: green;
+}
+
+.class {
+  background: blue;
+}
+
+.should-be-removed {
+  background: yellow;
+}
+
+.\[color\:var\(--custom-var-value\)\] {
+  color: var(--custom-var-value);
 }

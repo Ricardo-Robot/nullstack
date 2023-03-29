@@ -1,138 +1,166 @@
-import {isFalse, isText} from '../shared/nodes';
-import client from './client';
-import render from './render';
-import {anchorableElement} from './anchorableNode';
+import generateTruthyString from '../shared/generateTruthyString'
+import { isFalse, isText, isUndefined } from '../shared/nodes'
+import { anchorableElement } from './anchorableNode'
+import client from './client'
+import { eventCallbacks, eventSubjects, generateCallback } from './events'
+import { reref } from './ref'
+import render from './render'
 
-export default function rerender(selector, current, next) {
-
-  current = current === undefined ? client.virtualDom : current;
-  next = next === undefined ? client.nextVirtualDom : next;
-
-  if(next.instance) {
-    next.instance._self.element = selector;
-  }
-
-  if(!client.hydrated && selector) {
-    for(const element of selector.childNodes) {
-      if(element.tagName && element.tagName.toLowerCase() == 'textarea' && element.childNodes.length == 0) {
-        element.appendChild(document.createTextNode(''));
+function updateAttributes(selector, currentAttributes, nextAttributes) {
+  const attributeNames = Object.keys({ ...currentAttributes, ...nextAttributes })
+  for (const name of attributeNames) {
+    if (name === 'debounce') continue
+    if (name === 'ref' && nextAttributes?.ref?.property) {
+      reref(nextAttributes, selector)
+    } else if (name === 'html') {
+      if (nextAttributes[name] !== currentAttributes[name]) {
+        selector.innerHTML = nextAttributes[name]
+        anchorableElement(selector)
       }
-      if(element.COMMENT_NODE === 8 && element.textContent === '#') {
-        selector.removeChild(element);
+    } else if (name === 'checked' || name === 'value') {
+      if (nextAttributes[name] !== currentAttributes[name] && nextAttributes[name] !== selector[name]) {
+        selector[name] = nextAttributes[name]
       }
-    }
-  }
-
-  if(isFalse(current) && isFalse(next)) {
-    return;
-  }
-
-  if((isFalse(current) || isFalse(next)) && current != next) {
-    const nextSelector = render(next);
-    return selector.replaceWith(nextSelector);
-  }
-
-  if(current.type == 'head' && next.type == 'head') {
-    return;
-  }
-
-  if(current.type == 'head' || next.type == 'head') {
-    const nextSelector = render(next);
-    return selector.replaceWith(nextSelector);
-  }
-
-  if (current.type !== next.type) {
-    const nextSelector = render(next);
-    return selector.replaceWith(nextSelector);
-  }
-
-  if (isText(current) && isText(next)) {
-    if(current != next) {
-      selector.nodeValue = next;
-    }
-    return;
-  }
-
-  if (current.type === next.type) {
-
-    const attributeNames = Object.keys({...current.attributes, ...next.attributes});
-    for(const name of attributeNames) {
-      if(name === 'html') {
-        if(next.attributes[name] !== current.attributes[name]) {
-          selector.innerHTML = next.attributes[name];
-          anchorableElement(selector);
-        }        
-      } else if(name === 'checked') {
-        if(next.attributes[name] !== selector.value) {
-          selector.checked = next.attributes[name];
-        }
-      } else if(name === 'value') {
-        if(next.attributes[name] !== selector.value) {
-          selector.value = next.attributes[name];
-        }
-      } else if(name.startsWith('on')) {
-        const eventName = name.replace('on', '');
-        const key = '_event.' + eventName;
-        selector.removeEventListener(eventName, current[key]);
-        if(next.attributes[name]) {
-          next[key] = (event) => {
-            if(next.attributes.default !== true) {
-              event.preventDefault();
-            }
-            next.attributes[name]({...next.attributes, event});
-          };
-          selector.addEventListener(eventName, next[key]);
-        }
+    } else if (name.startsWith('on')) {
+      const eventName = name.substring(2)
+      const eventNames = eventCallbacks.get(selector)
+      if (!eventNames) {
+        selector.addEventListener(eventName, generateCallback(selector, name))
       } else {
-        const type = typeof(next.attributes[name]);
-        if(type !== 'object' && type !== 'function') {
-          if(current.attributes[name] !== undefined && next.attributes[name] === undefined) {
-            selector.removeAttribute(name);
-          } else if(current.attributes[name] !== next.attributes[name]) {
-            if(name != 'value' && next.attributes[name] === false || next.attributes[name] === null || next.attributes[name] === undefined) {
-              selector.removeAttribute(name);
-            } else if(name != 'value' && next.attributes[name] === true) {
-              selector.setAttribute(name, '');
-            } else {
-              selector.setAttribute(name, next.attributes[name]);
-            }
+        const callback = eventNames[name]
+        if (callback && !nextAttributes[name]) {
+          selector.removeEventListener(eventName, callback)
+          delete eventNames[name]
+        } else if (nextAttributes[name]) {
+          if (!callback) {
+            selector.addEventListener(eventName, generateCallback(selector, name))
+          }
+          eventSubjects.set(selector, nextAttributes)
+        }
+      }
+    } else {
+      let currentValue
+      if ((name === 'class' || name === 'style') && Array.isArray(currentAttributes[name])) {
+        currentValue = generateTruthyString(currentAttributes[name])
+      } else {
+        currentValue = currentAttributes[name]
+      }
+      let nextValue
+      if ((name === 'class' || name === 'style') && Array.isArray(nextAttributes[name])) {
+        nextValue = generateTruthyString(nextAttributes[name])
+      } else {
+        nextValue = nextAttributes[name]
+      }
+      const type = typeof nextValue
+      if (type !== 'object' && type !== 'function') {
+        if (currentValue !== undefined && nextValue === undefined) {
+          selector.removeAttribute(name)
+        } else if (currentValue !== nextValue) {
+          if ((name !== 'value' && nextValue === false) || nextValue === null || nextValue === undefined) {
+            selector.removeAttribute(name)
+          } else if (name !== 'value' && nextValue === true) {
+            selector.setAttribute(name, '')
+          } else {
+            selector.setAttribute(name, nextValue)
           }
         }
       }
     }
+  }
+}
 
-    if(next.attributes.html) return;
+function updateHeadChild(current, next) {
+  if (isUndefined(current) && !isUndefined(next)) {
+    const nextSelector = render(next)
+    client.head.append(nextSelector)
+    return
+  }
+  if (!isUndefined(current) && isUndefined(next)) {
+    current.element.remove()
+    return
+  }
+  next.element = current.element
+  if (isFalse(current) && isFalse(next)) {
+    return
+  }
+  if (current.type !== next.type) {
+    const nextSelector = render(next)
+    current.element.replaceWith(nextSelector)
+    return
+  }
+  updateAttributes(current.element, current.attributes, next.attributes)
+}
 
-    const limit = Math.max(current.children.length, next.children.length);
-    if(next.children.length > current.children.length) {
-      for(let i = 0; i < current.children.length; i++) {
-        rerender(selector.childNodes[i], current.children[i], next.children[i]);
-      }
-      for(let i = current.children.length; i < next.children.length; i++) {
-        const nextSelector = render(next.children[i]);
-        selector.appendChild(nextSelector);
-      }
-    } else if(current.children.length > next.children.length) {
-      for(let i = 0; i < next.children.length; i++) {
-        rerender(selector.childNodes[i], current.children[i], next.children[i]);
-      }
-      for(let i = current.children.length - 1; i >= next.children.length; i--) {
-        selector.removeChild(selector.childNodes[i]);          
-      }
-    } else {
-      for(let i = limit - 1; i > -1; i--) {
-        rerender(selector.childNodes[i], current.children[i], next.children[i]);
-      }
-    }
+function updateHeadChildren(currentChildren, nextChildren) {
+  const limit = Math.max(currentChildren.length, nextChildren.length)
+  for (let i = 0; i < limit; i++) {
+    updateHeadChild(currentChildren[i], nextChildren[i])
+  }
+}
 
-    if(next.type == 'textarea') {
-      selector.value = next.children.join("");
-    }
+function _rerender(current, next) {
+  const selector = current.element
+  next.element = current.element
 
-    if(next.type == 'select') {
-      selector.value = next.attributes.value;
-    }
-
+  if (isFalse(current) && isFalse(next)) {
+    return
   }
 
+  if (current.type !== next.type) {
+    const nextSelector = render(next)
+    selector.replaceWith(nextSelector)
+    return
+  }
+
+  if (current.type === 'textarea') {
+    current.attributes.value = current.children[0].text
+    next.attributes.value = next.children[0].text
+    updateAttributes(selector, current.attributes, next.attributes)
+    return
+  }
+
+  if (isText(current) && isText(next)) {
+    if (current.text !== next.text) {
+      selector.textContent = next.text
+    }
+    return
+  }
+
+  if (!next.attributes.html) {
+    const limit = Math.max(current.children.length, next.children.length)
+    if (next.children.length > current.children.length) {
+      for (let i = 0; i < current.children.length; i++) {
+        _rerender(current.children[i], next.children[i])
+      }
+      for (let i = current.children.length; i < next.children.length; i++) {
+        const nextSelector = render(next.children[i])
+        selector.appendChild(nextSelector)
+      }
+    } else if (current.children.length > next.children.length) {
+      for (let i = 0; i < next.children.length; i++) {
+        _rerender(current.children[i], next.children[i])
+      }
+      for (let i = current.children.length - 1; i >= next.children.length; i--) {
+        selector.childNodes[i].remove()
+      }
+    } else {
+      for (let i = limit - 1; i > -1; i--) {
+        _rerender(current.children[i], next.children[i])
+      }
+    }
+  }
+
+  updateAttributes(selector, current.attributes, next.attributes)
+}
+
+export default function rerender() {
+  _rerender(client.virtualDom, client.nextVirtualDom)
+  updateAttributes(client.body, client.currentBody, client.nextBody)
+  updateHeadChildren(client.currentHead, client.nextHead)
+  client.virtualDom = client.nextVirtualDom
+  client.nextVirtualDom = null
+  client.currentBody = client.nextBody
+  client.nextBody = {}
+  client.currentHead = client.nextHead
+  client.nextHead = []
 }

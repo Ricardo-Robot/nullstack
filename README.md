@@ -1,14 +1,14 @@
 <img src='https://raw.githubusercontent.com/nullstack/nullstack/master/nullstack.png' height='60' alt='Nullstack'>
 
-Full-stack javascript components for one-dev armies.
+Feature-Driven Full Stack JavaScript Components
 
 ## What is Nullstack?
 
-Nullstack is a full-stack framework for building progressive web applications.
+Nullstack is a feature-driven full stack JavaScript framework that helps you build isomorphic applications and stay focused on shipping products to production.
 
-It connects a stateful UI layer to specialized microservices in the same component using vanilla javascript.
+Write the backend and frontend of a feature in a single component and let the framework decide where the code should run.
 
-Focus on solving your business logic instead of writing glue code.
+Nullstack provides you all the tools you need to stay focused on the product.
 
 Learn more about [Nullstack](https://nullstack.app)
 

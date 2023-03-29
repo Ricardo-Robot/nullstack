@@ -1,35 +1,32 @@
-const puppeteer = require('puppeteer');
-
-let browser;
-let page;
-
 beforeAll(async () => {
-  browser = await puppeteer.launch();
-  page = await browser.newPage();
-  await page.goto('http://localhost:6969/context-data');
-});
+  await page.goto('http://localhost:6969/context-data')
+  await page.waitForSelector('[data-hydrated]')
+})
 
 describe('ContextData', () => {
+  test('data attributes are added to the dom', async () => {
+    const element = await page.$('[data-multiply-by="3"]')
+    expect(element).toBeTruthy()
+  })
 
-  test('is part of the client context', async () => {
-    const element = await page.$('[data-data]');
-    expect(element).toBeTruthy();
-  });
+  test('data attributes are merged into the data attribute and passed to events', async () => {
+    await page.click('[data-multiply-by="3"]')
+    await page.waitForSelector('[data-count-with-default="6"]')
+    const element = await page.$('[data-count-with-default="6"]')
+    expect(element).toBeTruthy()
+  })
 
-  test('data attributs can be mixed with data-key', async () => {
-    await page.click('button');
-    await page.waitForSelector('[data-count="5"]');
-    const element = await page.$('[data-count="5"]');
-    expect(element).toBeTruthy();
-  });
+  test('data attributes are added into a new data object and passed to events if no data attribute is provided', async () => {
+    await page.click('[data-set-to="2"]')
+    await page.waitForSelector('[data-count-without-default="2"]')
+    const element = await page.$('[data-count-without-default="2"]')
+    expect(element).toBeTruthy()
+  })
 
-  test('data attribuets are camelized into data key', async () => {
-    const element = await page.$('[data-framework-name="Nullstack"]');
-    expect(element).toBeTruthy();
-  });
-
-});
-
-afterAll(async () => {
-  browser.close();
-});
+  test('data attributes are kebabized when generating the data argument', async () => {
+    await page.click('[data-set-to="2"]')
+    await page.waitForSelector('[data-count-without-default="2"]')
+    const element = await page.$('[data-count-without-default="2"]')
+    expect(element).toBeTruthy()
+  })
+})
